@@ -1,39 +1,66 @@
 
-name: CD - Deploy API Gateway
+name: CI-CD Pipeline
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'k8s/**'
-      - '.github/workflows/deploy.yml'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  deploy:
-    name: Deploy to Kubernetes
+  ci:
+    name: CI - Validate and Build
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Download repository code
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 2. Install kubectl
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          version: latest
+          python-version: "3.x"
 
-      # 3. Configure Kubernetes access
-      - name: Configure Kubernetes credentials
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+      - name: Install YAML validator
+        run: pip install PyYAML
+
+      - name: Validate Kubernetes YAML
         run: |
+          python -c "import yaml; yaml.safe_load(open('k8/deployment.yml')); yaml.safe_load(open('k8/service.yml')); print('YAML syntax is valid')"
+
+      - name: Verify Dockerfile
+        run: |
+          if [ -f Dockerfile ]; then
+            echo "Dockerfile found"
+          else
+            echo "Dockerfile not found; skipping image build"
+          fi
+
+      - name: Build Docker image
+        if: hashFiles('Dockerfile') != ''
+        run: docker build -t api-gateway:${{ github.sha }} .
+
+      - name: CI completed
+        run: echo "CI validation and available build checks passed"
+
+  # FUTURE CD:
+  # Enable this job after configuring a reachable Kubernetes cluster.
+  # Configure kubeconfig and credentials before running kubectl.
+  #
+  # deploy:
+  #   needs: ci
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Configure Kubernetes access
+  #       run: echo "Configure your cluster credentials here"
+  #     - name: Deploy API Gateway
+  #       run: kubectl apply -f k8/deployment.yml
+  #     - name: Deploy Service
+  #       run: kubectl apply -f k8/service.yml
           mkdir -p "$HOME/.kube"
           echo "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
