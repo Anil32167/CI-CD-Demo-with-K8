@@ -20,7 +20,7 @@ jobs:
 
       - name: Deploy API Gateway
         run: |
-          kubectl apply -f k8s/deployment.yml
+          kubectl apply -f k8/deployment.yml
 
       - name: Verify deployment
         run: |
