@@ -45,25 +45,6 @@ jobs:
       - name: CI completed
         run: echo "CI validation and available build checks passed"
 
-  # FUTURE CD:
-  # Enable this job after configuring a reachable Kubernetes cluster.
-  # Configure kubeconfig and credentials before running kubectl.
-  #
-  # deploy:
-  #   needs: ci
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Configure Kubernetes access
-  #       run: echo "Configure your cluster credentials here"
-  #     - name: Deploy API Gateway
-  #       run: kubectl apply -f k8/deployment.yml
-  #     - name: Deploy Service
-  #       run: kubectl apply -f k8/service.yml
-          mkdir -p "$HOME/.kube"
-          echo "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-
       # 4. Verify cluster connectivity
       - name: Check Kubernetes cluster
         run: kubectl get nodes
