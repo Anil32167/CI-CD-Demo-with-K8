@@ -1,32 +1,62 @@
-name: Deploy API Gateway
+
+name: CD - Deploy API Gateway
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'k8s/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
+    name: Deploy to Kubernetes
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Download repository code
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Configure Kubernetes access
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+      # 2. Install kubectl
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
 
+      # 3. Configure Kubernetes access
+      - name: Configure Kubernetes credentials
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      # 4. Verify cluster connectivity
+      - name: Check Kubernetes cluster
+        run: kubectl get nodes
+
+      # 5. Validate Kubernetes manifests
+      - name: Validate deployment manifests
+        run: |
+          kubectl apply --dry-run=client -f k8/deployment.yml
+          kubectl apply --dry-run=client -f k8/service.yml
+
+      # 6. Deploy application
       - name: Deploy API Gateway
         run: |
           kubectl apply -f k8/deployment.yml
-
-      - name: Deploy API Gateway
-        run: |
           kubectl apply -f k8/service.yml
 
+      # 7. Verify rollout
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/api-gateway
+          kubectl rollout status deployment/api-gateway --timeout=120s
           kubectl get pods
+          kubectl get services
